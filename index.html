@@ -2,223 +2,439 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>The Apex Arena</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Apex - Grand Evolution (Max Level 200)</title>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: #03030d; 
-            color: white; 
-            font-family: sans-serif; 
-            user-select: none;
-        }
-        #canvas { 
-            display: block; 
-            background: #040412; 
-            outline: none;
-        }
-        .hud { 
-            position: absolute; 
-            pointer-events: none; 
-            font-weight: bold; 
-        }
-        #stats { 
-            top: 20px; 
-            left: 20px; 
-            font-size: 22px; 
-            display: flex; 
-            gap: 30px; 
-            background: rgba(5, 5, 20, 0.9); 
-            padding: 14px 24px; 
-            border-radius: 10px; 
-            border: 2px solid #00ffcc;
-        }
-        #upgrade-menu {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(6, 6, 22, 0.98);
-            border: 3px solid #ffcc00;
-            border-radius: 16px;
-            padding: 30px;
-            display: none;
+        body {
+            margin: 0;
+            background-color: #08080c;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
-            z-index: 100;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        .upgrade-card {
-            background: #111133;
-            border: 2px solid #00ffcc;
-            color: white;
-            padding: 15px 40px;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 240px;
-            text-align: center;
+        h1 {
+            margin: 2px 0;
+            font-size: 2.2rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+        #ui-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            background: #12121c;
+            padding: 8px 20px;
+            border-radius: 5px;
+            border: 1px solid #333;
+        }
+        #evolution-alert {
             font-weight: bold;
-            font-size: 16px;
+            color: #00ffcc;
+            text-shadow: 0 0 8px currentColor;
         }
-        .upgrade-card:hover { background: #00ffcc; color: black; }
+        #gameCanvas {
+            background-color: #0e0e14;
+            border: 4px solid #2b2b3d;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+            border-radius: 6px;
+        }
+        #upgrade-menu {
+            margin-top: 8px;
+            display: flex;
+            gap: 12px;
+            visibility: hidden;
+        }
+        .upgrade-hint {
+            background: #1a1a26;
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            animation: pulse 1.5s infinite;
+        }
+        .hint {
+            margin-top: 5px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
     </style>
 </head>
 <body>
 
+    <h1>THE APEX</h1>
+    
+    <div id="ui-bar">
+        <div>HP: <span id="hp">100</span>/<span id="max-hp">100</span></div>
+        <div>Level: <span id="level">1</span>/200</div>
+        <div>Class Tier [<span id="tier-num">1</span>]: <span id="evolution-alert">Recruit Triangle</span></div>
+        <div>XP: <span id="xp">0</span>/<span id="xp-needed">10</span></div>
+        <div>Score: <span id="score">0</span></div>
+    </div>
+    
+    <canvas id="gameCanvas" width="900" height="550"></canvas>
+    
     <div id="upgrade-menu">
-        <h2 style="color: #ffcc00; margin: 0;">LEVEL UP!</h2>
-        <p style="color: #aaa; margin: 0 0 10px 0;">Select your Tank-Style trait upgrade:</p>
-        <div class="upgrade-card" onclick="applyUpgrade('hp')">❤️ Hull Core (+25 Max HP)</div>
-        <div class="upgrade-card" onclick="applyUpgrade('speed')">⚡ Thrusters (+1.5 Speed)</div>
-        <div class="upgrade-card" onclick="applyUpgrade('size')">💥 Blast Radius (+5 Size)</div>
+        <div class="upgrade-hint">1: +Speed</div>
+        <div class="upgrade-hint">2: +Damage</div>
+        <div class="upgrade-hint">3: +Fire Rate</div>
+        <div class="upgrade-hint">4: +Max HP</div>
     </div>
 
-    <canvas id="canvas" tabindex="0"></canvas>
+    <div class="hint">Move: <b>WASD / Arrows</b> | Shoot: <b>SPACE</b> | Restart: <b>ENTER</b> on Game Over</div>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
 
-    <div id="stats" class="hud">
-        <div style="color: #ff3333;">HP: <span id="txt-hp">100</span>/<span id="txt-maxhp">100</span></div>
-        <div style="color: #ffcc00;">Level: <span id="txt-lv">1</span></div>
-        <div style="color: #00ffcc;">Coins: <span id="txt-coins">0</span></div>
-    </div>   <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        function resize() { 
-            canvas.width = window.innerWidth; 
-            canvas.height = window.innerHeight; 
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        // DOM Setup
+        const hpEl = document.getElementById("hp");
+        const maxHpEl = document.getElementById("max-hp");
+        const levelEl = document.getElementById("level");
+        const tierEl = document.getElementById("tier-num");
+        const evoEl = document.getElementById("evolution-alert");
+        const xpEl = document.getElementById("xp");
+        const xpNeededEl = document.getElementById("xp-needed");
+        const scoreEl = document.getElementById("score");
+        const upgradeMenu = document.getElementById("upgrade-menu");
 
-        let isUpgrading = false;
-        let stats = { level: 1, coins: 0, kills: 0 };
-        let player = { 
-            x: 2000, y: 2000, speed: 6, 
-            color: '#00ffcc', shadeColor: '#00aa88',
-            hp: 100, maxHp: 100, invuln: 0, anim: 0
+        // Core Systems
+        let score = 0;
+        let gameOver = false;
+        let lastShotTime = 0;
+
+        // Soft scaling system for XP so leveling up never gets impossibly hard
+        let level = 1;
+        let xp = 0;
+        let xpNeeded = 15; 
+        let upgradePoints = 0;
+
+        // 20 Tiers of Evolutions (Every 10 levels up to 200)
+        const evolutionClasses = [
+            { name: "Recruit Triangle", color: "#00ff66" },     // Lvl 1
+            { name: "Dual Strike Diamond", color: "#00bfff" },  // Lvl 10
+            { name: "Viper Tri-Spread", color: "#ff00ff" },     // Lvl 20
+            { name: "Quad-Core Cross", color: "#ffff00" },      // Lvl 30
+            { name: "Pentagon Enforcer", color: "#ff4500" },    // Lvl 40
+            { name: "Hex Shield Vanguard", color: "#9370db" },  // Lvl 50
+            { name: "Septa Blast Striker", color: "#00ffea" },  // Lvl 60
+            { name: "Octo Eclipse Core", color: "#ff1493" },    // Lvl 70
+            { name: "Nova Multi-Barrage", color: "#adff2f" },   // Lvl 80
+            { name: "Deca-Titan Fortress", color: "#ff8c00" },  // Lvl 90
+            { name: "Centurion Prism", color: "#da70d6" },      // Lvl 100
+            { name: "Hyperion Matrix", color: "#7fffd4" },      // Lvl 110
+            { name: "Quantum Singular", color: "#ff69b4" },     // Lvl 120
+            { name: "Cosmic Overlord", color: "#ba55d3" },      // Lvl 130
+            { name: "Plasma Destroyer", color: "#00fa9a" },     // Lvl 140
+            { name: "Apex Dreadnought", color: "#ff6347" },     // Lvl 150
+            { name: "Astral Behemoth", color: "#b0c4de" },      // Lvl 160
+            { name: "Chronos Sentinel", color: "#dee2ff" },     // Lvl 170
+            { name: "Infinity Catalyst", color: "#e0aaff" },    // Lvl 180
+            { name: "The Absolute Apex", color: "#fff3b0" }      // Lvl 190-200
+        ];
+
+        let stats = { speedLevel: 1, damageLevel: 1, fireRateLevel: 1, hpLevel: 1 };
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 30,
+            get speed() { return 3.5 + (stats.speedLevel * 0.3); },
+            get damage() { return 10 + (stats.damageLevel * 4); },
+            get fireRate() { return Math.max(80, 480 - (stats.fireRateLevel * 35)); }, 
+            get maxHp() { return 100 + (stats.hpLevel * 25); },
+            hp: 100
         };
-        let blastSize = 10;
-        let keys = {};
-        let mouse = { x: 0, y: 0 };
-        let projectiles = [];
+
         let enemies = [];
+        let bullets = [];
 
-        canvas.addEventListener('keydown', (e) => { 
-            keys[e.key.toLowerCase()] = true; 
-            if(['w','a','s','d','arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
+        const keys = {
+            w: false, a: false, s: false, d: false, Space: false,
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false
+        };
+
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space") keys.Space = true;
+            else if (e.key in keys) keys[e.key] = true;
+            else if (e.code === "ArrowUp") keys.ArrowUp = true;
+            else if (e.code === "ArrowDown") keys.ArrowDown = true;
+            else if (e.code === "ArrowLeft") keys.ArrowLeft = true;
+            else if (e.code === "ArrowRight") keys.ArrowRight = true;
+
+            if (upgradePoints > 0 && !gameOver) {
+                if (e.key === "1") allocateStat("speedLevel");
+                if (e.key === "2") allocateStat("damageLevel");
+                if (e.key === "3") allocateStat("fireRateLevel");
+                if (e.key === "4") allocateStat("hpLevel");
+            }
+            if (e.code === "Enter" && gameOver) restartGame();
         });
-        canvas.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-        window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
-        canvas.addEventListener('mousedown', (e) => {
-            if(isUpgrading || player.hp <= 0 || e.target.closest('#upgrade-menu')) return;
-            let angle = Math.atan2(mouse.y - canvas.height/2, mouse.x - canvas.width/2);
-            projectiles.push({ x: player.x, y: player.y, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15, life: 60, size: blastSize });
+        window.addEventListener("keyup", (e) => {
+            if (e.code === "Space") keys.Space = false;
+            else if (e.key in keys) keys[e.key] = false;
+            else if (e.code === "ArrowUp") keys.ArrowUp = false;
+            else if (e.code === "ArrowDown") keys.ArrowDown = false;
+            else if (e.code === "ArrowLeft") keys.ArrowLeft = false;
+            else if (e.code === "ArrowRight") keys.ArrowRight = false;
         });
 
-        function applyUpgrade(choice) {
-            if(choice === 'hp') { player.maxHp += 25; player.hp = player.maxHp; }
-            if(choice === 'speed') { player.speed += 1.5; }
-            if(choice === 'size') { blastSize += 5; }
-            isUpgrading = false;
-            document.getElementById('upgrade-menu').style.display = 'none';
-            canvas.focus();
-            updateHUD();
+        function allocateStat(name) {
+            stats[name]++;
+            upgradePoints--;
+            if (name === "hpLevel") player.hp += 25;
+            updateUI();
         }
 
-        function spawnEnemy() {
-            let mult = 1 + (stats.level * 0.15);
-            let angle = Math.random() * Math.PI * 2;
-            let dist = 600 + Math.random() * 200;
-            enemies.push({ x: player.x + Math.cos(angle)*dist, y: player.y + Math.sin(angle)*dist, hp: 20*mult, speed: 1.8 + (stats.level*0.2), size: 26*mult });
-        }
-        for(let i=0; i<6; i++) spawnEnemy();
-
-        function updateHUD() {
-            document.getElementById('txt-hp').innerText = player.hp;
-            document.getElementById('txt-maxhp').innerText = player.maxHp;
-            document.getElementById('txt-lv').innerText = stats.level;
-            document.getElementById('txt-coins').innerText = stats.coins;
-        }
-
-        function drawDetailCharacter(x, y, size, mainColor, accentColor, isBot, frame) {
-            ctx.save();
-            let glow = ctx.createRadialGradient(x, y, size*0.2, x, y, size*1.3);
-            glow.addColorStop(0, mainColor); glow.addColorStop(0.5, accentColor + '33'); glow.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, size*1.3, 0, Math.PI*2); ctx.fill();
-
-            ctx.fillStyle = mainColor; ctx.beginPath();
-            for(let i=0; i<=6; i++) {
-                let a = Math.PI + (i * (Math.PI / 6));
-                let wave = Math.sin(frame * 0.15 + i) * 4;
-                ctx.lineTo(x + Math.cos(a + 0.2)*(size*0.9), y + Math.sin(a + 0.2)*(size*0.9) - 15 + wave);
+        function collectXP(amount) {
+            if (level >= 200) return; 
+            xp += amount;
+            if (xp >= xpNeeded) {
+                xp -= xpNeeded;
+                level++;
+                upgradePoints++;
+                // Gentle arithmetic scale (+4 flat requirement per level instead of exponential)
+                xpNeeded += 4; 
             }
-            ctx.fill();
-
-            ctx.fillStyle = '#0f0f26'; ctx.strokeStyle = mainColor; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.arc(x, y, size*0.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-
-            ctx.fillStyle = '#ffffff'; ctx.shadowBlur = 10; ctx.shadowColor = mainColor;
-            ctx.fillRect(x - size*0.22, y - 3, 5, 5); ctx.fillRect(x + size*0.12, y - 3, 5, 5);
-            ctx.restore();
+            updateUI();
         }
 
-        function loop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(player.hp <= 0) {
-                ctx.fillStyle = "rgba(20, 0, 0, 0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "white"; ctx.font = "bold 40px sans-serif"; ctx.textAlign = "center";
-                ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2); return;
+        function getCurrentTierIndex() {
+            let tier = Math.floor((level - 1) / 10);
+            return Math.min(tier, evolutionClasses.length - 1);
+        }
+
+        function updateUI() {
+            let currentTier = getCurrentTierIndex();
+            hpEl.innerText = Math.max(0, Math.floor(player.hp));
+            maxHpEl.innerText = player.maxHp;
+            levelEl.innerText = level;
+            tierEl.innerText = currentTier + 1;
+            evoEl.innerText = evolutionClasses[currentTier].name;
+            evoEl.style.color = evolutionClasses[currentTier].color;
+            xpEl.innerText = xp;
+            xpNeededEl.innerText = xpNeeded;
+            scoreEl.innerText = score;
+            upgradeMenu.style.visibility = upgradePoints > 0 ? "visible" : "hidden";
+        }
+
+        function spawnEnemyBot() {
+            if (gameOver) return;
+            let x, y;
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? -40 : canvas.width + 40;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? -40 : canvas.height + 40;
             }
-            if(isUpgrading) { requestAnimationFrame(loop); return; }
-            player.anim++;
+            
+            const scalingHp = 15 + (level * 3); 
+            enemies.push({
+                x: x, y: y, size: 22,
+                speed: 1.2 + (Math.random() * 0.4) + Math.min(2.0, level * 0.01),
+                hp: scalingHp, maxHp: scalingHp
+            });
+        }
 
-            if(keys['w'] || keys['arrowup']) player.y -= player.speed;
-            if(keys['s'] || keys['arrowdown']) player.y += player.speed;
-            if(keys['a'] || keys['arrowleft']) player.x -= player.speed;
-            if(keys['d'] || keys['arrowright']) player.x += player.speed;
+        function processFiredProjectiles() {
+            const now = Date.now();
+            if (keys.Space && now - lastShotTime >= player.fireRate) {
+                let tier = getCurrentTierIndex();
 
-            let camX = canvas.width / 2 - player.x;
-            let camY = canvas.height / 2 - player.y;
-            if(player.invuln > 0) player.invuln--;
-
-            ctx.strokeStyle = '#14143a'; ctx.lineWidth = 2;
-            for(let i=0; i<4000; i+=120) {
-                ctx.beginPath(); ctx.moveTo(i + camX, camY); ctx.lineTo(i + camX, 4000 + camY); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(camX, i + camY); ctx.lineTo(4000 + camX, i + camY); ctx.stroke();
-            }
-
-            for(let i = projectiles.length - 1; i >= 0; i--) {
-                let p = projectiles[i]; p.x += p.vx; p.y += p.vy; p.life--;
-                ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(p.x + camX, p.y + camY, p.size, 0, Math.PI*2); ctx.fill();
-
-                for(let j = enemies.length - 1; j >= 0; j--) {
-                    let e = enemies[j];
-                    if(Math.hypot(p.x - e.x, p.y - e.y) < e.size*0.6) {
-                        e.hp -= 10; p.life = 0;
-                        if(e.hp <= 0) {
-                            enemies.splice(j, 1); stats.kills++; stats.coins += 5;
-                            if(stats.kills % 3 === 0) { stats.level++; isUpgrading = true; document.getElementById('upgrade-menu').style.display = 'flex'; }
-                            updateHUD(); spawnEnemy();
-                        }
+                if (tier === 0) {
+                    fireBullet(0, -8);
+                } else if (tier === 1) {
+                    fireBullet(-8, -8); fireBullet(8, -8);
+                } else if (tier === 2) {
+                    fireBullet(0, -8, 0); fireBullet(-4, -8, -1.5); fireBullet(4, -8, 1.5);
+                } else if (tier === 3) {
+                    fireBullet(0, -8, 0); fireBullet(0, 8, 0); fireBullet(-8, 0, 0, -8, 0); fireBullet(8, 0, 0, 8, 0);
+                } else {
+                    let totalShots = 3 + Math.floor(tier / 2);
+                    let spreadSpread = 0.5 + (tier * 0.15);
+                    fireBullet(0, -9, 0); 
+                    for (let i = 1; i <= Math.floor(totalShots / 2); i++) {
+                        fireBullet(-3 * i, -9, -spreadSpread * i);
+                        fireBullet(3 * i, -9, spreadSpread * i);
                     }
                 }
-                if(p.life <= 0) projectiles.splice(i, 1);
+                lastShotTime = now;
+            }
+        }
+
+        function fireBullet(offsetX, speedY, speedX = 0, customStartX = null, customStartY = null) {
+            bullets.push({
+                x: (customStartX !== null) ? player.x + customStartX : player.x + offsetX - 3,
+                y: (customStartY !== null) ? player.y + customStartY : player.y - player.size / 2,
+                width: 6, height: 14,
+                speedY: speedY, speedX: speedX
+            });
+        }
+
+        function runGameTick() {
+            if (gameOver) return;
+
+            let moveX = 0, moveY = 0;
+            if (keys.w || keys.ArrowUp) moveY -= player.speed;
+            if (keys.s || keys.ArrowDown) moveY += player.speed;
+            if (keys.a || keys.ArrowLeft) moveX -= player.speed;
+            if (keys.d || keys.ArrowRight) moveX += player.speed;
+
+            player.x += moveX; player.y += moveY;
+
+            const halfSize = player.size / 2;
+            if (player.x < halfSize) player.x = halfSize;
+            if (player.x > canvas.width - halfSize) player.x = canvas.width - halfSize;
+            if (player.y < halfSize) player.y = halfSize;
+            if (player.y > canvas.height - halfSize) player.y = canvas.height - halfSize;
+
+            processFiredProjectiles();
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.y += b.speedY; b.x += b.speedX;
+                if (b.y < -30 || b.y > canvas.height + 30 || b.x < -30 || b.x > canvas.width + 30) {
+                    bullets.splice(i, 1);
+                }
             }
 
-            enemies.forEach(e => {
-                let angle = Math.atan2(player.y - e.y, player.x - e.x);
-                e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed;
-                drawDetailCharacter(e.x + camX, e.y + camY, e.size, '#ff3355', '#990022', true, player.anim);
-                if(Math.hypot(player.x - e.x, player.y - e.y) < (e.size*0.5 + 16) && player.invuln === 0) { player.hp -= 15; player.invuln = 30; updateHUD(); }
-            });
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let bot = enemies[i];
+                let bCenterX = bot.x + bot.size / 2;
+                let bCenterY = bot.y + bot.size / 2;
+                
+                let run = player.x - bCenterX;
+                let rise = player.y - bCenterY;
+                let pathLength = Math.sqrt(run * run + rise * rise);
 
-            if(player.invuln > 20) { ctx.fillStyle = "rgba(255, 0, 0, 0.25)"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-            drawDetailCharacter(canvas.width / 2, canvas.height / 2, 34, player.color, player.shadeColor, false, player.anim);
-            requestAnimationFrame(loop);
+                if (pathLength > 0) {
+                    bot.x += (run / pathLength) * bot.speed;
+                    bot.y += (rise / pathLength) * bot.speed;
+                }
+                if (player.x + halfSize > bot.x && player.x - halfSize < bot.x + bot.size &&
+    player.y + halfSize > bot.y && player.y - halfSize < bot.y + bot.size) {
+    player.hp -= 0.6;
+    updateUI();
+    if (player.hp <= 0) gameOver = true;
+}
+
+for (let j = bullets.length - 1; j >= 0; j--) {
+    let laser = bullets[j];
+    if (laser.x < bot.x + bot.size && laser.x + laser.width > bot.x &&
+        laser.y < bot.y + bot.size && laser.y + laser.height > bot.y) {
+        bullets.splice(j, 1);
+        bot.hp -= player.damage;
+
+        if (bot.hp <= 0) {
+            enemies.splice(i, 1);
+            score += 15;
+            collectXP(5); 
+            break;
         }
-        canvas.focus();
-        loop();
-    </script>
-</body>
-</html>
-   
+    }
+}
+}
+}
+
+function drawPlayerCharacter() {
+    let tier = getCurrentTierIndex();
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = evolutionClasses[tier].color;
+    ctx.shadowColor = evolutionClasses[tier].color;
+
+    ctx.beginPath();
+    let points = 3 + tier; 
+    if (tier === 0) {
+        ctx.moveTo(0, -player.size / 2);
+        ctx.lineTo(-player.size / 2, player.size / 2);
+        ctx.lineTo(player.size / 2, player.size / 2);
+    } else if (tier === 1) {
+        ctx.moveTo(0, -player.size * 0.6);
+        ctx.lineTo(player.size * 0.5, 0);
+        ctx.lineTo(0, player.size * 0.6);
+        ctx.lineTo(-player.size * 0.5, 0);
+    } else {
+        for (let i = 0; i < points * 2; i++) {
+            let angle = (Math.PI / points) * i;
+            let r = (i % 2 === 0) ? player.size * 0.75 : player.size * 0.35;
+            ctx.lineTo(Math.sin(angle) * r, -Math.cos(angle) * r);
+        }
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawScene() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let tier = getCurrentTierIndex();
+
+    bullets.forEach(b => {
+        ctx.fillStyle = evolutionClasses[tier].color;
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+    });
+
+    enemies.forEach(bot => {
+        ctx.fillStyle = "#e63946";
+        ctx.fillRect(bot.x, bot.y, bot.size, bot.size);
+
+        let hpRatio = bot.hp / bot.maxHp;
+        ctx.fillStyle = "#2b2b3d";
+        ctx.fillRect(bot.x, bot.y - 7, bot.size, 3);
+        ctx.fillStyle = "#ff3333";
+        ctx.fillRect(bot.x, bot.y - 7, bot.size * hpRatio, 3);
+    });
+
+    drawPlayerCharacter();
+
+    if (gameOver) {
+        ctx.fillStyle = "rgba(4, 4, 8, 0.95)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = "#ff3333";
+        ctx.font = "bold 42px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("SYSTEM TERMINATED", canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(`Final Evolution Class: ${evolutionClasses[tier].name}`, canvas.width / 2, canvas.height / 2 + 25);
+        ctx.fillText(`Final Level Achieved: ${level} | Score: ${score}`, canvas.width / 2, canvas.height / 2 + 60);
+        ctx.fillText("Press ENTER to Re-Evolve", canvas.width / 2, canvas.height / 2 + 110);
+    }
+}
+
+function mainGameLoop() {
+    runGameTick();
+    drawScene();
+    requestAnimationFrame(mainGameLoop);
+}
+
+function restartGame() {
+    score = 0; level = 1; xp = 0; xpNeeded = 15; upgradePoints = 0;
+    stats.speedLevel = 1; stats.damageLevel = 1; stats.fireRateLevel = 1; stats.hpLevel = 1;
+    player.hp = 100; player.x = canvas.width / 2; player.y = canvas.height / 2;
+    enemies = []; bullets = []; gameOver = false;
+    updateUI();
+}
+
+setInterval(spawnEnemyBot, 800); 
+updateUI();
+mainGameLoop();
