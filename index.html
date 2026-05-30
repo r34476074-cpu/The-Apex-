@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Apex Game</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #050510; 
+            color: white; 
+            font-family: sans-serif; 
+        }
+        #canvas { 
+            display: block; 
+            background: #0a0a20; 
+        }
+        .hud { 
+            position: absolute; 
+            pointer-events: none; 
+            font-weight: bold; 
+        }
+        #stats { 
+            top: 20px; 
+            left: 20px; 
+            font-size: 18px; 
+            display: flex; 
+            gap: 15px; 
+            background: rgba(0,0,0,0.6); 
+            padding: 10px; 
+            border-radius: 6px; 
+        }
+        #sidebar { 
+            top: 20px; 
+            right: 20px; 
+            width: 230px; 
+            background: rgba(10,10,30,0.85); 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: 2px solid #8a2be2; 
+            pointer-events: auto; 
+        }
+        .btn { 
+            width: 100%; 
+            background: #8a2be2; 
+            color: white; 
+            border: none; 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="stats" class="hud">
+        <div>Lv: <span id="txt-lv">1</span></div>
+        <div>Coins: <span id="txt-coins">0</span></div>
+        <div>Kills: <span id="txt-kills">0</span></div>
+    </div>
+
+    <div id="sidebar" class="hud">
+        <h3 style="color:#ffcc00; text-align:center;">LEADERBOARD</h3>
+        <ul style="padding-left:20px; font-size:14px;">
+            <li>You (CodePioneer) - Lv. <span id="lead-lv">1</span></li>
+            <li>NasaBuilder - Lv. 310</li>
+            <li>ChefBotAI - Lv. 115</li>
+        </ul>
+        <h3 style="color:#ffcc00; text-align:center;">GACHA RE-ROLL</h3>
+        <button class="btn" onclick="rollGacha()">Roll Aura (10 Coins)</button>
+        <div id="gacha-txt" style="font-size:12px; text-align:center; color:#aaa;">Roll for special powers!</div>
+        
+        <h3 style="color:#ffcc00; text-align:center;">AVATARS</h3>
+        <button class="btn" style="background:#00ffcc; color:black;" onclick="setSkin('#00ffcc')">Base Form</button>
+        <button class="btn" style="background:#ff9900;" onclick="setSkin('#ff9900')">Super Form</button>
+    </div>
+
+    <script>
+        // Game configuration scripts
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resize() { 
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let stats = { level: 1, coins: 0, kills: 0 };
+        let player = { x: 2000, y: 2000, speed: 5, color: '#00ffcc', aura: false, auraColor: '' };
+        let keys = { w:false, a:false, s:false, d:false };
+        let mouse = { x:0, y:0 };
+        let projectiles = [];
+        let enemies = [];
+
+        window.addEventListener('keydown', (e) => { 
+            let k = e.key.toLowerCase();
+            if(k in keys) keys[k] = true; 
+        });
+        window.addEventListener('keyup', (e) => { 
+            let k = e.key.toLowerCase();
+            if(k in keys) keys[k] = false; 
+        });
+        window.addEventListener('mousemove', (e) => { 
+            mouse.x = e.clientX; 
+            mouse.y = e.clientY; 
+        });
+
+        window.addEventListener('click', (e) => {
+            if(e.clientX > window.innerWidth - 260 && e.clientY < 450) return; 
+            let screenX = canvas.width / 2;
+            let screenY = canvas.height / 2;
+            let angle = Math.atan2(mouse.y - screenY, mouse.x - screenX);
+            projectiles.push({
+                x: player.x,
+                y: player.y,
+                vx: Math.cos(angle) * 12,
+                vy: Math.sin(angle) * 12,
+                life: 60
+            });
+        });
+
+        function spawnEnemy() {
+            let mult = 1 + (stats.level * 0.1);
+            let angle = Math.random() * Math.PI * 2;
+            let dist = 400 + Math.random() * 200;
+            enemies.push({
+                x: player.x + Math.cos(angle) * dist,
+                y: player.y + Math.sin(angle) * dist,
+                hp: 20 * mult,
+                speed: 1.5 + (stats.level * 0.2),
+                size: 20 * mult
+            });
+        }
+        for(let i=0; i<6; i++) {
+            spawnEnemy();
+        }
+
+        function rollGacha() {
+            if(stats.coins < 10) { 
+                document.getElementById('gacha-txt').innerText = "Need 10 Coins!"; 
+                return; 
+            }
+            stats.coins -= 10;
+            let roll = Math.random();
+            if(roll > 0.5) { 
+                player.aura = true; 
+                player.auraColor = '#00ffff'; 
+                document.getElementById('gacha-txt').innerText = "Rare Blue Aura!"; 
+            } else { 
+                player.aura = true; 
+                player.auraColor = 'gold'; 
+                document.getElementById('gacha-txt').innerText = "LEGENDARY GOLDEN KI!"; 
+            }
+            updateHUD();
+        }
+
+        function setSkin(color) { 
+            player.color = color; 
+        }
+
+        function updateHUD() {
+            document.getElementById('txt-lv').innerText = stats.level;
+            document.getElementById('txt-coins').innerText = stats.coins;
+            document.getElementById('txt-kills').innerText = stats.kills;
+            document.getElementById('lead-lv').innerText = stats.level;
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if(keys.w) player.y -= player.speed;
+            if(keys.s) player.y += player.speed;
+            if(keys.a) player.x -= player.speed;
+            if(keys.d) player.x += player.speed;
+
+            let camX = canvas.width / 2 - player.x;
+            let camY = canvas.height / 2 - player.y;
+
+            ctx.strokeStyle = '#151540';
+            ctx.lineWidth = 2;
+            for(let i=0; i<4000; i+=100) {
+                ctx.beginPath(); 
+                ctx.moveTo(i + camX, camY); 
+                ctx.lineTo(i + camX, 4000 + camY); 
+                ctx.stroke();
+                
+                ctx.beginPath(); 
+                ctx.moveTo(camX, i + camY); 
+                ctx.lineTo(4000 + camX, i + camY); 
+                ctx.stroke();
+            }
+
+            for(let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                p.x += p.vx; 
+                p.y += p.vy; 
+                p.life--;
+                
+                ctx.fillStyle = player.color;
+                ctx.beginPath(); 
+                ctx.arc(p.x + camX, p.y + camY, 8, 0, Math.PI*2); 
+                ctx.fill();
+
+                for(let j = enemies.length - 1; j >= 0; j--) {
+                    let e = enemies[j];
+                    let dist = Math.hypot(p.x - e.x, p.y - e.y);
+                    if(dist < e.size) {
+                        e.hp -= 10; 
+                        p.life = 0;
+                        if(e.hp <= 0) {
+                            enemies.splice(j, 1);
+                            stats.kills++; 
+                            stats.coins += Math.floor(Math.random()*4)+2;
+                            if(stats.kills % 3 === 0) stats.level++;
+                            updateHUD(); 
+                            spawnEnemy();
+                        }
+                    }
+                }
+                if(p.life <= 0) projectiles.splice(i, 1);
+            }
+
+            ctx.fillStyle = '#ff3333';
+            enemies.forEach(e => {
+                let angle = Math.atan2(player.y - e.y, player.x - e.x);
+                e.x += Math.cos(angle) * e.speed; 
+                e.y += Math.sin(angle) * e.speed;
+                ctx.fillRect(e.x - e.size/2 + camX, e.y - e.size/2 + camY, e.size, e.size);
+            });
+
+            if(player.aura) {
+                ctx.strokeStyle = player.auraColor; 
+                ctx.lineWidth = 4;
+                ctx.beginPath(); 
+                ctx.arc(canvas.width/2, canvas.height/2, 25, 0, Math.PI*2); 
+                ctx.stroke();
+            }
+            ctx.fillStyle = player.color;
+            ctx.fillRect(canvas.width/2 - 15, canvas.height/2 - 15, 30, 30);
+
+            requestAnimationFrame(loop);
+        }
+        loop();
+    </script>
+</body>
+</html>
