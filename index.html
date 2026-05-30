@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Apex - Grand Evolution (Max Level 200)</title>
+    <title>The Apex - Branching Evolutions</title>
     <style>
         body {
             margin: 0;
@@ -35,7 +35,7 @@
             border-radius: 5px;
             border: 1px solid #333;
         }
-        #evolution-alert {
+        #class-display {
             font-weight: bold;
             color: #00ffcc;
             text-shadow: 0 0 8px currentColor;
@@ -50,17 +50,22 @@
             margin-top: 8px;
             display: flex;
             gap: 12px;
-            visibility: hidden;
+            min-height: 35px;
         }
-        .upgrade-hint {
+        .upgrade-btn {
             background: #1a1a26;
             border: 1px solid #00ffcc;
             color: #00ffcc;
-            padding: 5px 10px;
+            padding: 5px 12px;
             border-radius: 3px;
             font-size: 0.85rem;
             font-weight: bold;
+            cursor: pointer;
             animation: pulse 1.5s infinite;
+        }
+        .upgrade-btn:hover {
+            background: #00ffcc;
+            color: #000;
         }
         .hint {
             margin-top: 5px;
@@ -68,9 +73,9 @@
             color: #666;
         }
         @keyframes pulse {
-            0% { opacity: 0.7; }
+            0% { opacity: 0.8; }
             50% { opacity: 1; }
-            100% { opacity: 0.7; }
+            100% { opacity: 0.8; }
         }
     </style>
 </head>
@@ -80,82 +85,54 @@
     
     <div id="ui-bar">
         <div>HP: <span id="hp">100</span>/<span id="max-hp">100</span></div>
-        <div>Level: <span id="level">1</span>/200</div>
-        <div>Class Tier [<span id="tier-num">1</span>]: <span id="evolution-alert">Recruit Triangle</span></div>
-        <div>XP: <span id="xp">0</span>/<span id="xp-needed">10</span></div>
+        <div>Level: <span id="level">1</span></div>
+        <div>Class: <span id="class-display">Basic Apex</span></div>
+        <div>XP: <span id="xp">0</span>/<span id="xp-needed">15</span></div>
         <div>Score: <span id="score">0</span></div>
     </div>
     
-    <canvas id="gameCanvas" width="900" height="550"></canvas>
+    <canvas id="gameCanvas" width="900" height="520"></canvas>
     
-    <div id="upgrade-menu">
-        <div class="upgrade-hint">1: +Speed</div>
-        <div class="upgrade-hint">2: +Damage</div>
-        <div class="upgrade-hint">3: +Fire Rate</div>
-        <div class="upgrade-hint">4: +Max HP</div>
-    </div>
+    <div id="upgrade-menu"></div>
 
     <div class="hint">Move: <b>WASD / Arrows</b> | Shoot: <b>SPACE</b> | Restart: <b>ENTER</b> on Game Over</div>
-    <script>
+      <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        // DOM Setup
+        // DOM Elements
         const hpEl = document.getElementById("hp");
         const maxHpEl = document.getElementById("max-hp");
         const levelEl = document.getElementById("level");
-        const tierEl = document.getElementById("tier-num");
-        const evoEl = document.getElementById("evolution-alert");
+        const classEl = document.getElementById("class-display");
         const xpEl = document.getElementById("xp");
         const xpNeededEl = document.getElementById("xp-needed");
         const scoreEl = document.getElementById("score");
         const upgradeMenu = document.getElementById("upgrade-menu");
 
-        // Core Systems
+        // Game Trackers
         let score = 0;
         let gameOver = false;
         let lastShotTime = 0;
 
-        // Soft scaling system for XP so leveling up never gets impossibly hard
+        // Soft Progression System
         let level = 1;
         let xp = 0;
-        let xpNeeded = 15; 
-        let upgradePoints = 0;
+        let xpNeeded = 15;
+        let pendingEvolution = false;
 
-        // 20 Tiers of Evolutions (Every 10 levels up to 200)
-        const evolutionClasses = [
-            { name: "Recruit Triangle", color: "#00ff66" },     // Lvl 1
-            { name: "Dual Strike Diamond", color: "#00bfff" },  // Lvl 10
-            { name: "Viper Tri-Spread", color: "#ff00ff" },     // Lvl 20
-            { name: "Quad-Core Cross", color: "#ffff00" },      // Lvl 30
-            { name: "Pentagon Enforcer", color: "#ff4500" },    // Lvl 40
-            { name: "Hex Shield Vanguard", color: "#9370db" },  // Lvl 50
-            { name: "Septa Blast Striker", color: "#00ffea" },  // Lvl 60
-            { name: "Octo Eclipse Core", color: "#ff1493" },    // Lvl 70
-            { name: "Nova Multi-Barrage", color: "#adff2f" },   // Lvl 80
-            { name: "Deca-Titan Fortress", color: "#ff8c00" },  // Lvl 90
-            { name: "Centurion Prism", color: "#da70d6" },      // Lvl 100
-            { name: "Hyperion Matrix", color: "#7fffd4" },      // Lvl 110
-            { name: "Quantum Singular", color: "#ff69b4" },     // Lvl 120
-            { name: "Cosmic Overlord", color: "#ba55d3" },      // Lvl 130
-            { name: "Plasma Destroyer", color: "#00fa9a" },     // Lvl 140
-            { name: "Apex Dreadnought", color: "#ff6347" },     // Lvl 150
-            { name: "Astral Behemoth", color: "#b0c4de" },      // Lvl 160
-            { name: "Chronos Sentinel", color: "#dee2ff" },     // Lvl 170
-            { name: "Infinity Catalyst", color: "#e0aaff" },    // Lvl 180
-            { name: "The Absolute Apex", color: "#fff3b0" }      // Lvl 190-200
-        ];
-
-        let stats = { speedLevel: 1, damageLevel: 1, fireRateLevel: 1, hpLevel: 1 };
+        // Branching Tree Properties
+        let playerClass = "Basic Apex"; 
+        let bulletPattern = "single"; 
 
         const player = {
             x: canvas.width / 2,
             y: canvas.height / 2,
             size: 30,
-            get speed() { return 3.5 + (stats.speedLevel * 0.3); },
-            get damage() { return 10 + (stats.damageLevel * 4); },
-            get fireRate() { return Math.max(80, 480 - (stats.fireRateLevel * 35)); }, 
-            get maxHp() { return 100 + (stats.hpLevel * 25); },
+            speed: 4.5,
+            damage: 12,
+            fireRate: 350, 
+            maxHp: 100,
             hp: 100
         };
 
@@ -167,6 +144,7 @@
             ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false
         };
 
+        // Key Listeners
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space") keys.Space = true;
             else if (e.key in keys) keys[e.key] = true;
@@ -175,12 +153,6 @@
             else if (e.code === "ArrowLeft") keys.ArrowLeft = true;
             else if (e.code === "ArrowRight") keys.ArrowRight = true;
 
-            if (upgradePoints > 0 && !gameOver) {
-                if (e.key === "1") allocateStat("speedLevel");
-                if (e.key === "2") allocateStat("damageLevel");
-                if (e.key === "3") allocateStat("fireRateLevel");
-                if (e.key === "4") allocateStat("hpLevel");
-            }
             if (e.code === "Enter" && gameOver) restartGame();
         });
 
@@ -193,46 +165,91 @@
             else if (e.code === "ArrowRight") keys.ArrowRight = false;
         });
 
-        function allocateStat(name) {
-            stats[name]++;
-            upgradePoints--;
-            if (name === "hpLevel") player.hp += 25;
-            updateUI();
-        }
-
         function collectXP(amount) {
-            if (level >= 200) return; 
             xp += amount;
             if (xp >= xpNeeded) {
                 xp -= xpNeeded;
                 level++;
-                upgradePoints++;
-                // Gentle arithmetic scale (+4 flat requirement per level instead of exponential)
-                xpNeeded += 4; 
+                xpNeeded += 5; // Gentle upgrade scaling
+
+                // Check for Branching Choices Threshold
+                if (level === 10 || level === 25) {
+                    pendingEvolution = true;
+                }
             }
             updateUI();
         }
 
-        function getCurrentTierIndex() {
-            let tier = Math.floor((level - 1) / 10);
-            return Math.min(tier, evolutionClasses.length - 1);
-        }
-
+        // Branch System Menu Choices generator
         function updateUI() {
-            let currentTier = getCurrentTierIndex();
             hpEl.innerText = Math.max(0, Math.floor(player.hp));
             maxHpEl.innerText = player.maxHp;
             levelEl.innerText = level;
-            tierEl.innerText = currentTier + 1;
-            evoEl.innerText = evolutionClasses[currentTier].name;
-            evoEl.style.color = evolutionClasses[currentTier].color;
+            classEl.innerText = playerClass;
             xpEl.innerText = xp;
             xpNeededEl.innerText = xpNeeded;
             scoreEl.innerText = score;
-            upgradeMenu.style.visibility = upgradePoints > 0 ? "visible" : "hidden";
+
+            // Render buttons dynamically if an upgrade choice is ready
+            upgradeMenu.innerHTML = "";
+            if (pendingEvolution) {
+                if (level >= 10 && level < 25 && playerClass === "Basic Apex") {
+                    createUpgradeButton("1: Twin Blaster", () => chooseBranch("Twin Blaster", "twin"));
+                    createUpgradeButton("2: Sniper", () => chooseBranch("Sniper", "sniper"));
+                } 
+                else if (level >= 25) {
+                    if (playerClass === "Twin Blaster") {
+                        createUpgradeButton("1: Triple Spread", () => chooseBranch("Triple Spread", "triple"));
+                        createUpgradeButton("2: Flank Guard", () => chooseBranch("Flank Guard", "flank"));
+                    } else if (playerClass === "Sniper") {
+                        createUpgradeButton("1: Assassin", () => chooseBranch("Assassin", "assassin"));
+                        createUpgradeButton("2: Hunter", () => chooseBranch("Hunter", "hunter"));
+                    }
+                }
+            }
         }
 
-        function spawnEnemyBot() {
+        function createUpgradeButton(text, callback) {
+            const btn = document.createElement("button");
+            btn.className = "upgrade-btn";
+            btn.innerText = text;
+            btn.onclick = () => {
+                callback();
+                updateUI();
+            };
+            upgradeMenu.appendChild(btn);
+        }
+
+        function chooseBranch(className, patternName) {
+            playerClass = className;
+            bulletPattern = patternName;
+            pendingEvolution = false;
+
+            // Apply Class specific modifiers
+            if (className === "Twin Blaster") {
+                player.fireRate = 280;
+                player.damage = 10; 
+            } else if (className === "Sniper") {
+                player.fireRate = 550;
+                player.damage = 35;
+                player.speed = 4.0;
+            } else if (className === "Triple Spread") {
+                player.fireRate = 260;
+                player.damage = 12;
+            } else if (className === "Flank Guard") {
+                player.fireRate = 200;
+                player.damage = 11;
+                player.maxHp = 140;
+                player.hp += 40;
+            } else if (className === "Assassin") {
+                player.fireRate = 650;
+                player.damage = 70;
+            } else if (className === "Hunter") {
+                player.fireRate = 400;
+                player.damage = 25;
+            }
+        }
+           function spawnEnemyBot() {
             if (gameOver) return;
             let x, y;
             if (Math.random() < 0.5) {
@@ -242,11 +259,10 @@
                 x = Math.random() * canvas.width;
                 y = Math.random() < 0.5 ? -40 : canvas.height + 40;
             }
-            
-            const scalingHp = 15 + (level * 3); 
+            const scalingHp = 15 + (level * 3.5); 
             enemies.push({
                 x: x, y: y, size: 22,
-                speed: 1.2 + (Math.random() * 0.4) + Math.min(2.0, level * 0.01),
+                speed: 1.2 + Math.min(1.8, level * 0.02),
                 hp: scalingHp, maxHp: scalingHp
             });
         }
@@ -254,34 +270,43 @@
         function processFiredProjectiles() {
             const now = Date.now();
             if (keys.Space && now - lastShotTime >= player.fireRate) {
-                let tier = getCurrentTierIndex();
-
-                if (tier === 0) {
-                    fireBullet(0, -8);
-                } else if (tier === 1) {
-                    fireBullet(-8, -8); fireBullet(8, -8);
-                } else if (tier === 2) {
-                    fireBullet(0, -8, 0); fireBullet(-4, -8, -1.5); fireBullet(4, -8, 1.5);
-                } else if (tier === 3) {
-                    fireBullet(0, -8, 0); fireBullet(0, 8, 0); fireBullet(-8, 0, 0, -8, 0); fireBullet(8, 0, 0, 8, 0);
-                } else {
-                    let totalShots = 3 + Math.floor(tier / 2);
-                    let spreadSpread = 0.5 + (tier * 0.15);
-                    fireBullet(0, -9, 0); 
-                    for (let i = 1; i <= Math.floor(totalShots / 2); i++) {
-                        fireBullet(-3 * i, -9, -spreadSpread * i);
-                        fireBullet(3 * i, -9, spreadSpread * i);
-                    }
+                // Determine pattern mechanics based on branching choice
+                if (bulletPattern === "single") {
+                    fireBullet(0, -9, 0);
+                } 
+                else if (bulletPattern === "twin") {
+                    fireBullet(-10, -9, 0);
+                    fireBullet(10, -9, 0);
+                } 
+                else if (bulletPattern === "sniper") {
+                    fireBullet(0, -14, 0, 10); // Very fast speed, custom bullet height
+                } 
+                else if (bulletPattern === "triple") {
+                    fireBullet(0, -9, 0);
+                    fireBullet(-4, -9, -2);
+                    fireBullet(4, -9, 2);
+                } 
+                else if (bulletPattern === "flank") {
+                    fireBullet(0, -9, 0); // Forward
+                    fireBullet(0, 9, 0);  // Backward
+                } 
+                else if (bulletPattern === "assassin") {
+                    fireBullet(0, -18, 0, 14); // Ultra bullet speed and length
+                } 
+                else if (bulletPattern === "hunter") {
+                    fireBullet(0, -11, 0);
+                    // Second rapid bullet delayed slightly
+                    setTimeout(() => { if(!gameOver) fireBullet(0, -11, 0); }, 100);
                 }
                 lastShotTime = now;
             }
         }
 
-        function fireBullet(offsetX, speedY, speedX = 0, customStartX = null, customStartY = null) {
+        function fireBullet(offsetX, speedY, speedX = 0, customHeight = 14) {
             bullets.push({
-                x: (customStartX !== null) ? player.x + customStartX : player.x + offsetX - 3,
-                y: (customStartY !== null) ? player.y + customStartY : player.y - player.size / 2,
-                width: 6, height: 14,
+                x: player.x + offsetX - 3,
+                y: player.y - player.size / 2,
+                width: 6, height: customHeight,
                 speedY: speedY, speedX: speedX
             });
         }
@@ -315,126 +340,131 @@
 
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let bot = enemies[i];
-                let bCenterX = bot.x + bot.size / 2;
-                let bCenterY = bot.y + bot.size / 2;
-                
-                let run = player.x - bCenterX;
-                let rise = player.y - bCenterY;
-                let pathLength = Math.sqrt(run * run + rise * rise);
+                let run = player.x - (bot.x + bot.size / 2);
+                let rise = player.y - (bot.y + bot.size / 2);
+                let dist = Math.sqrt(run * run + rise * rise);
 
-                if (pathLength > 0) {
-                    bot.x += (run / pathLength) * bot.speed;
-                    bot.y += (rise / pathLength) * bot.speed;
+                if (dist > 0) {
+                    bot.x += (run / dist) * bot.speed;
+                    bot.y += (rise / dist) * bot.speed;
                 }
+
                 if (player.x + halfSize > bot.x && player.x - halfSize < bot.x + bot.size &&
-    player.y + halfSize > bot.y && player.y - halfSize < bot.y + bot.size) {
-    player.hp -= 0.6;
-    updateUI();
-    if (player.hp <= 0) gameOver = true;
-}
+                    player.y + halfSize > bot.y && player.y - halfSize < bot.y + bot.size) {
+                    player.hp -= 0.6;
+                    updateUI();
+                    if (player.hp <= 0) gameOver = true;
+                }
 
-for (let j = bullets.length - 1; j >= 0; j--) {
-    let laser = bullets[j];
-    if (laser.x < bot.x + bot.size && laser.x + laser.width > bot.x &&
-        laser.y < bot.y + bot.size && laser.y + laser.height > bot.y) {
-        bullets.splice(j, 1);
-        bot.hp -= player.damage;
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    let laser = bullets[j];
+                    if (laser.x < bot.x + bot.size && laser.x + laser.width > bot.x &&
+                        laser.y < bot.y + bot.size && laser.y + laser.height > bot.y) {
+                        bullets.splice(j, 1);
+                        bot.hp -= player.damage;
 
-        if (bot.hp <= 0) {
-            enemies.splice(i, 1);
-            score += 15;
-            collectXP(5); 
-            break;
+                        if (bot.hp <= 0) {
+                            enemies.splice(i, 1);
+                            score += 15;
+                            collectXP(5);
+                            break;
+                        }
+                    }
+                }
+            }
         }
-    }
-}
-}
-}
 
-function drawPlayerCharacter() {
-    let tier = getCurrentTierIndex();
-    ctx.save();
-    ctx.translate(player.x, player.y);
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = evolutionClasses[tier].color;
-    ctx.shadowColor = evolutionClasses[tier].color;
+        function drawPlayerCharacter() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.shadowBlur = 18;
 
-    ctx.beginPath();
-    let points = 3 + tier; 
-    if (tier === 0) {
-        ctx.moveTo(0, -player.size / 2);
-        ctx.lineTo(-player.size / 2, player.size / 2);
-        ctx.lineTo(player.size / 2, player.size / 2);
-    } else if (tier === 1) {
-        ctx.moveTo(0, -player.size * 0.6);
-        ctx.lineTo(player.size * 0.5, 0);
-        ctx.lineTo(0, player.size * 0.6);
-        ctx.lineTo(-player.size * 0.5, 0);
-    } else {
-        for (let i = 0; i < points * 2; i++) {
-            let angle = (Math.PI / points) * i;
-            let r = (i % 2 === 0) ? player.size * 0.75 : player.size * 0.35;
-            ctx.lineTo(Math.sin(angle) * r, -Math.cos(angle) * r);
+            // Color adjustments reflecting upgrade tier status
+            if (bulletPattern === "single") { ctx.fillStyle = "#00ff66"; ctx.shadowColor = "#00ff66"; }
+            else if (playerClass === "Twin Blaster" || playerClass === "Sniper") { ctx.fillStyle = "#00bfff"; ctx.shadowColor = "#00bfff"; }
+            else { ctx.fillStyle = "#ff00ff"; ctx.shadowColor = "#ff00ff"; }
+
+            ctx.beginPath();
+            if (bulletPattern === "single" || bulletPattern === "sniper" || bulletPattern === "assassin") {
+                // Triangle / Pointer profiles
+                ctx.moveTo(0, -player.size / 2);
+                ctx.lineTo(-player.size / 2, player.size / 2);
+                ctx.lineTo(player.size / 2, player.size / 2);
+            } else if (bulletPattern === "twin" || bulletPattern === "hunter") {
+                // Diamond configuration
+                ctx.moveTo(0, -player.size * 0.6);
+                ctx.lineTo(player.size * 0.5, 0);
+                ctx.lineTo(0, player.size * 0.6);
+                ctx.lineTo(-player.size * 0.5, 0);
+            } else {
+                // Multi-star array for final master classes
+                for (let i = 0; i < 12; i++) {
+                    ctx.rotate(Math.PI / 6);
+                    ctx.lineTo(0, -player.size * 0.7);
+                    ctx.rotate(Math.PI / 6);
+                    ctx.lineTo(0, -player.size * 0.3);
+                }
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
         }
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-}
 
-function drawScene() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    let tier = getCurrentTierIndex();
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    bullets.forEach(b => {
-        ctx.fillStyle = evolutionClasses[tier].color;
-        ctx.fillRect(b.x, b.y, b.width, b.height);
-    });
+            bullets.forEach(b => {
+                ctx.fillStyle = "#00ffff";
+                ctx.fillRect(b.x, b.y, b.width, b.height);
+            });
 
-    enemies.forEach(bot => {
-        ctx.fillStyle = "#e63946";
-        ctx.fillRect(bot.x, bot.y, bot.size, bot.size);
+            enemies.forEach(bot => {
+                ctx.fillStyle = "#e63946";
+                ctx.fillRect(bot.x, bot.y, bot.size, bot.size);
 
-        let hpRatio = bot.hp / bot.maxHp;
-        ctx.fillStyle = "#2b2b3d";
-        ctx.fillRect(bot.x, bot.y - 7, bot.size, 3);
-        ctx.fillStyle = "#ff3333";
-        ctx.fillRect(bot.x, bot.y - 7, bot.size * hpRatio, 3);
-    });
+                let hpRatio = bot.hp / bot.maxHp;
+                ctx.fillStyle = "#2b2b3d";
+                ctx.fillRect(bot.x, bot.y - 7, bot.size, 3);
+                ctx.fillStyle = "#ff3333";
+                ctx.fillRect(bot.x, bot.y - 7, bot.size * hpRatio, 3);
+            });
 
-    drawPlayerCharacter();
+            drawPlayerCharacter();
 
-    if (gameOver) {
-        ctx.fillStyle = "rgba(4, 4, 8, 0.95)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = "#ff3333";
-        ctx.font = "bold 42px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("SYSTEM TERMINATED", canvas.width / 2, canvas.height / 2 - 20);
-        
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "20px sans-serif";
-        ctx.fillText(`Final Evolution Class: ${evolutionClasses[tier].name}`, canvas.width / 2, canvas.height / 2 + 25);
-        ctx.fillText(`Final Level Achieved: ${level} | Score: ${score}`, canvas.width / 2, canvas.height / 2 + 60);
-        ctx.fillText("Press ENTER to Re-Evolve", canvas.width / 2, canvas.height / 2 + 110);
-    }
-}
+            if (gameOver) {
+                ctx.fillStyle = "rgba(4, 4, 8, 0.95)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = "#ff3333";
+                ctx.font = "bold 42px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("SYSTEM TERMINATED", canvas.width / 2, canvas.height / 2 - 20);
+                
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "20px sans-serif";
+                ctx.fillText(`Final Class: ${playerClass} | Level: ${level}`, canvas.width / 2, canvas.height / 2 + 25);
+                ctx.fillText("Press ENTER to Respawn", canvas.width / 2, canvas.height / 2 + 70);
+            }
+        }
 
-function mainGameLoop() {
-    runGameTick();
-    drawScene();
-    requestAnimationFrame(mainGameLoop);
-}
+        function mainGameLoop() {
+            runGameTick();
+            drawScene();
+            requestAnimationFrame(mainGameLoop);
+        }
 
-function restartGame() {
-    score = 0; level = 1; xp = 0; xpNeeded = 15; upgradePoints = 0;
-    stats.speedLevel = 1; stats.damageLevel = 1; stats.fireRateLevel = 1; stats.hpLevel = 1;
-    player.hp = 100; player.x = canvas.width / 2; player.y = canvas.height / 2;
-    enemies = []; bullets = []; gameOver = false;
-    updateUI();
-}
+        function restartGame() {
+            score = 0; level = 1; xp = 0; xpNeeded = 15;
+            playerClass = "Basic Apex"; bulletPattern = "single";
+            player.fireRate = 350; player.damage = 12; player.speed = 4.5; player.maxHp = 100; player.hp = 100;
+            player.x = canvas.width / 2; player.y = canvas.height / 2;
+            enemies = []; bullets = []; gameOver = false; pendingEvolution = false;
+            updateUI();
+        }
 
-setInterval(spawnEnemyBot, 800); 
-updateUI();
-mainGameLoop();
+        setInterval(spawnEnemyBot, 850); 
+        updateUI();
+        mainGameLoop();
+    </script>
+</body>
+</html>
